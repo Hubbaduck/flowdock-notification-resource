@@ -1,0 +1,23 @@
+---
+
+# settings for the flowdock-notification-resource pipeline
+
+meta:
+  target: ci
+  url:    https://concourse.boomerdigital.net
+  name:   flowdock-notification
+
+  initial_version: 0.0.1
+
+  dockerhub:
+    email:    (( "docker_mail" ))
+    username: (( "docker_user" ))
+    password: (( "docker_pass" ))
+    repository: hubbaduck/flowdock-drone
+
+  github:
+    owner: hubbaduck
+    repo:  flowdock-notification-resource
+    private_key:  (( "git_hub_key" ))
+    access_token: (( "access_token" ))
+

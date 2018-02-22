@@ -1,0 +1,54 @@
+#!/bin/bash
+
+set -e
+set -x
+
+exec 3>&1
+exec 1>&2
+
+PATH=/usr/local/bin:$PATH
+
+payload=$(mktemp /tmp/flowdock-out.XXXXXX)
+
+cat > $payload <&0
+
+concourse_display_name=$(jq -r ".params.username" < ${payload})
+concourse_msg_threadID=$(cat /proc/sys/kernel/random/uuid)
+concourse_avatar=$(jq -r ".params.icon_url" < ${payload})
+concourse_pipeline_url=$(jq -r ".params.pipeline_url" < ${payload})
+concourse_flow_token=$(jq -r ".params.flow_token" < ${payload})
+concourse_msg_event="activity"
+concourse_msg_status_value=$(jq -r ".params.msg_status_value" < ${payload})
+concourse_msg_status_color=$(jq -r ".params.statuscolor" < ${payload})
+concourse_pipeline_name=$(jq -r ".params.pipeline_name" < ${payload})
+concourse_msg_title=$(jq -r ".params.msg_title" < ${payload})
+concourse_msg_thread_title=$(jq -r ".params.thread_title" < ${payload})
+concourse_msg_field_label="Status Message"
+concourse_msg_field_value="All tests passed."
+concourse_msg_body=$(jq -r ".params.message" < ${payload})
+
+http_proxy=$(jq -r ".source.http_proxy" < ${payload})
+https_proxy=$(jq -r ".source.https_proxy" < ${payload})
+no_proxy=$(jq -r ".source.no_proxy" < ${payload})
+
+HEADER="\"flow_token\": \"${concourse_flow_token}\", \"event\": \"${concourse_msg_event}\", \"author\": {\"name\": \"${concourse_display_name}\", \"avatar\": \"${concourse_avatar}\"}"
+MSGINFO="\"title\": \"${concourse_msg_title}\", \"external_thread_id\": \"${concourse_msg_threadID}\""
+MSGTHREAD="\"thread\": {\"title\": \"${concourse_msg_thread_title}\", \"fields\": [{\"label\": \"${concourse_msg_field_label}\", \"value\": \"${concourse_msg_field_value}\"}], \"body\": \"${concourse_msg_body}\", \"external_url\": \"${concourse_pipeline_url}\", \"status\": {\"color\": \"${concourse_msg_status_color}\", \"value\": \"${concourse_msg_status_value}\"}}"
+
+MESSAGE="{${HEADER}, ${MSGINFO}, ${MSGTHREAD}}"
+API_URL="https://api.flowdock.com/messages"
+
+if [[ -z ${MESSAGE} ]]; then
+  echo -e "Cannot post message to Flowdock. \n Reason: Message is unset or empty."
+  exit 1
+fi
+
+if [[ -z ${API_URL} ]]; then
+  echo -e "Cannot post message to Flowdock. \n Reason: API URL is unset or empty."
+  exit 1
+fi
+
+http_proxy="${http_proxy}" https_proxy="${https_proxy}" no_proxy="${no_proxy}" \
+curl -i -X POST -H "Content-Type: application/json" -d "${MESSAGE}" ${API_URL}
+
+jq -n "{version:{timestamp:\"$(date +%s)\"}}" >&3
